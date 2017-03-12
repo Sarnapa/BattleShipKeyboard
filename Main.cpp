@@ -35,16 +35,22 @@ struct Missile
 	}
 };
 
+// identyfikatory komunikatow potrzebne do logiki gry
+UINT MissileMissMsg1, MissileTransferMsg1, MissileHitMsg1, MissileMissMsg2, MissileTransferMsg2, MissileHitMsg2,
+	 CanShootMsg1, CanShootMsg2, CannotShootMsg1, CannotShootMsg2;
+
 LPCWSTR windowClassName = _T("BattleShip");
 LPCWSTR windowTitle = _T("BattleShip Keys");
+TCHAR scoreString[] = _T("Score:");
+TCHAR firstScoreString[10];
+TCHAR secondScoreString[10];
 
 const int SIZE_X = 640;
 const int SIZE_Y = 400;
-const int MIN_X = 20;
-const int MAX_X = 580;
 int MIN_Y, MAX_Y;
 
-ShipRectangle shipRect(MIN_X, 150, 100, 50);
+ShipRectangle shipRect(20, 150, 100, 50);
+bool canShoot = false;
 int firstScore = 0;
 int secondScore = 0;
 int activeMissiles = 0;
@@ -112,6 +118,19 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		MessageBox(NULL, _T("Cannot create window!"), NULL, MB_ICONEXCLAMATION | MB_OK);
 		return 1;
 	}
+
+	//rejestracja komunikatow
+	MissileMissMsg1 = RegisterWindowMessage((LPCWSTR)("Miss1"));
+	MissileTransferMsg1 = RegisterWindowMessage((LPCWSTR)("Transfer1"));
+	MissileHitMsg1 = RegisterWindowMessage((LPCWSTR)("Hit1"));
+	MissileMissMsg2 = RegisterWindowMessage((LPCWSTR)("Miss2"));
+	MissileTransferMsg2 = RegisterWindowMessage((LPCWSTR)("Transfer2"));
+	MissileHitMsg2 = RegisterWindowMessage((LPCWSTR)("Hit2"));
+	CanShootMsg1 = RegisterWindowMessage((LPCWSTR)("CanShoot1"));
+	CannotShootMsg1 = RegisterWindowMessage((LPCWSTR)("CannotShoot1"));
+	CanShootMsg2 = RegisterWindowMessage((LPCWSTR)("CanShoot2"));
+	CannotShootMsg2 = RegisterWindowMessage((LPCWSTR)("CannotShoot2"));
+
 	hdc = GetDC(hwnd);
 	//tworzymy bufor na podwojne buforowanie
 	memDc = CreateCompatibleDC(hdc);
@@ -156,8 +175,32 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
 	PAINTSTRUCT ps; //zawiera informacje o odswiezanym obszarze
-	switch (msg)
+	if (msg == MissileMissMsg1)
+		--activeMissiles;
+	else if (msg == MissileTransferMsg1)
 	{
+		if (!missiles[2].active)
+		{
+			missiles[2].active = true;
+			missiles[2].left = SIZE_X;
+			missiles[2].top = lParam;
+		}
+		else if (!missiles[3].active)
+		{
+			missiles[3].active = true;
+			missiles[3].left = SIZE_X;
+			missiles[3].top = lParam;
+		}
+	}
+	else if (msg == MissileHitMsg1)
+	{
+		--activeMissiles;
+		++firstScore;
+	}
+	else
+	{
+		switch (msg)
+		{
 		case WM_PAINT:
 			hdc = BeginPaint(hwnd, &ps);
 			draw();
@@ -166,48 +209,48 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		case WM_KEYDOWN:
 			switch ((int)wParam)
 			{
-				case VK_UP:
-					if (shipRect.topRect > MIN_Y)
+			case VK_UP:
+				if (shipRect.topRect > MIN_Y)
+				{
+					hdc = GetDC(hwnd);
+					shipRect.topRect -= SHIP_SPEED;
+					draw();
+					ReleaseDC(hwnd, hdc);
+				}
+				break;
+			case VK_DOWN:
+				if (shipRect.topRect + shipRect.height < MAX_Y)
+				{
+					hdc = GetDC(hwnd);
+					shipRect.topRect += SHIP_SPEED;
+					draw();
+					ReleaseDC(hwnd, hdc);
+				}
+				break;
+			case VK_SPACE:
+				if (activeMissiles < 2)
+				{
+					++activeMissiles;
+					hdc = GetDC(hwnd);
+					if (!missiles[0].active)
 					{
-						hdc = GetDC(hwnd);
-						shipRect.topRect -= SHIP_SPEED;
-						draw();
-						ReleaseDC(hwnd, hdc);
+						missiles[0].active = true;
+						missiles[0].left = shipRect.leftRect + shipRect.width + 10;
+						missiles[0].top = shipRect.topRect + 15;
 					}
-					break;
-				case VK_DOWN:
-					if (shipRect.topRect + shipRect.height < MAX_Y)
+					else
 					{
-						hdc = GetDC(hwnd);
-						shipRect.topRect += SHIP_SPEED;
-						draw();
-						ReleaseDC(hwnd, hdc);
+						missiles[1].active = true;
+						missiles[1].left = shipRect.leftRect + shipRect.width + 10;
+						missiles[1].top = shipRect.topRect + 15;
 					}
-					break;
-				case VK_SPACE:
-					if (activeMissiles < 2)
-					{
-						++activeMissiles;
-						hdc = GetDC(hwnd);
-						if (!missiles[0].active)
-						{
-							missiles[0].active = true;
-							missiles[0].left = shipRect.leftRect + shipRect.width + 10;
-							missiles[0].top = shipRect.topRect + 15;
-						}
-						else
-						{
-							missiles[1].active = true;
-							missiles[1].left = shipRect.leftRect + shipRect.width + 10;
-							missiles[1].top = shipRect.topRect + 15;
-						}
-						draw();
-						ReleaseDC(hwnd, hdc);
-					}
-					break;
-				case VK_ESCAPE:
-					DestroyWindow(hwnd); // // generuje WM_DESTROY
-					break;
+					draw();
+					ReleaseDC(hwnd, hdc);
+				}
+				break;
+			case VK_ESCAPE:
+				DestroyWindow(hwnd); // // generuje WM_DESTROY
+				break;
 			}
 			break;
 		case WM_TIMER:
@@ -216,16 +259,30 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			{
 				if (missiles[i].active)
 				{
-					int speed = (i <= 2) ? MISSILE_SPEED : -MISSILE_SPEED;
-					missiles[i].left += MISSILE_SPEED;
-					if (i <= 2 && missiles[i].left + missiles[i].diameter > MAX_X)
+					int speed = (i < 2) ? MISSILE_SPEED : -MISSILE_SPEED;
+					missiles[i].left += speed;
+					if (i < 2 && missiles[i].left + missiles[i].diameter > SIZE_X)
 					{
+						PostMessage(HWND_BROADCAST, MissileTransferMsg2, NULL, missiles[i].top);
 						missiles[i].active = false;
-						--activeMissiles;
 					}
-					else if (i > 2 && missiles[i].left < MIN_X)
+					if (i >= 2)
 					{
-
+						if (missiles[i].left < shipRect.leftRect + shipRect.width &&
+							missiles[i].left > shipRect.leftRect)
+						{
+							if (!(missiles[i].top > shipRect.topRect + shipRect.height || missiles[i].top + missiles[i].diameter < shipRect.topRect))
+							{
+								PostMessage(HWND_BROADCAST, MissileHitMsg2, NULL, NULL);
+								missiles[i].active = false;
+								++secondScore;
+							}
+						}
+						if (missiles[i].left < 0)
+						{
+							PostMessage(HWND_BROADCAST, MissileMissMsg2, NULL, NULL);
+							missiles[i].active = false;
+						}
 					}
 				}
 			}
@@ -241,6 +298,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			break;
 		default:
 			return DefWindowProc(hwnd, msg, wParam, lParam); // system obsluzy
+		}
 	}
 	return 0;
 }
@@ -253,5 +311,9 @@ void draw()
 	for (int i = 0; i < 4; ++i)
 		if (missiles[i].active)
 			Ellipse(memDc, missiles[i].left, missiles[i].top, missiles[i].left + missiles[i].diameter, missiles[i].top + missiles[i].diameter);
+	SetTextColor(memDc, 0x606060);
+	TextOut(memDc, 200, 340, scoreString, ARRAYSIZE(scoreString));
+	TextOut(memDc, 300, 340, firstScoreString, wsprintf(firstScoreString, TEXT("%d"), firstScore));
+	TextOut(memDc, 400, 340, secondScoreString, wsprintf(secondScoreString, TEXT("%d"), secondScore));;
 	BitBlt(hdc, 0, 0, rectWindow.right, rectWindow.bottom, memDc, 0, 0, SRCCOPY);
 }
